@@ -460,8 +460,12 @@
         function showDropdownResults(matches) {
             if (!matches || matches.length === 0) { hideDropdown(); return; }
             window.tempSearchResults = matches;
-            let html = `<div class="dropdown-header"><i class="fas fa-list mr-1"></i>พบ ${matches.length} รายการ — แตะเพื่อเลือก</div>`;
-            matches.slice(0, 10).forEach((m, idx) => {
+            const SHOW_LIMIT = 40;
+            const shown = matches.slice(0, SHOW_LIMIT);
+            let headerText = `พบ ${matches.length} รายการ — แตะเพื่อเลือก`;
+            if (matches.length > SHOW_LIMIT) headerText = `พบ ${matches.length} รายการ (แสดง ${SHOW_LIMIT} รายการแรก พิมพ์เพิ่มเพื่อค้นหาให้แคบลง)`;
+            let html = `<div class="dropdown-header"><i class="fas fa-list mr-1"></i>${headerText}</div>`;
+            shown.forEach((m, idx) => {
                 html += `<div class="dropdown-item" ontouchstart="this.style.background='#fff7ed'" ontouchend="this.style.background=''" onclick="selectDropdownResult(${idx})">
                     <div style="flex:1;min-width:0">
                         <div class="dropdown-item-name">${m.Name}</div>
