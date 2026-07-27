@@ -33,6 +33,10 @@
         
         .laser-line { position: absolute; left: 0; width: 100%; height: 3px; background-color: #EF4444; box-shadow: 0 0 15px 3px rgba(239, 68, 68, 0.8); animation: scan-laser 2s infinite linear; }
         @keyframes scan-laser { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+
+        #zoom-slider { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.3); outline: none; }
+        #zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #EF4444; border: 2px solid white; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+        #zoom-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #EF4444; border: 2px solid white; cursor: pointer; }
         
         .swal-custom-input { width: 100% !important; text-align: center; font-size: 2.5rem !important; font-weight: bold; padding: 10px; border-radius: 12px; border: 2px solid #F97316; margin-bottom: 5px; outline: none; color: #C2410C; }
         .swal-unit-btn { background: #FFF7ED; color: #EA580C; border: 1px solid #FED7AA; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
@@ -136,6 +140,12 @@
                     <div class="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-red-500 rounded-br-xl"></div>
                     <div class="laser-line"></div>
                 </div>
+            </div>
+            <div id="zoom-control" class="hidden absolute bottom-8 left-1/2 -translate-x-1/2 z-20 items-center gap-3 bg-black/60 backdrop-blur-md rounded-full px-4 py-2.5" style="width:82%; max-width:340px;">
+                <i class="fas fa-search-minus text-white text-xs"></i>
+                <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1" class="flex-1" oninput="onZoomChange(this.value)">
+                <i class="fas fa-search-plus text-white text-xs"></i>
+                <span id="zoom-value" class="text-white text-[11px] font-bold w-9 text-right">1.0x</span>
             </div>
         </div>
     </div>
@@ -789,19 +799,63 @@
                 }
             });
         }
+        let currentZoomFeature = null;
+
         function startCamera() {
             document.getElementById('camera-modal').classList.remove('hidden');
+            document.getElementById('zoom-control').classList.add('hidden');
+            currentZoomFeature = null;
             setTimeout(() => {
                 if (html5QrCode) { try { if(html5QrCode.isScanning) { html5QrCode.stop().then(() => html5QrCode.clear()); } else { html5QrCode.clear(); } } catch(e) {} }
                 html5QrCode = new Html5Qrcode("reader");
                 const formatsToSupport = [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A ];
-                html5QrCode.start( { facingMode: "environment" }, { fps: 5, qrbox: { width: 250, height: 120 }, disableFlip: true, formatsToSupport: formatsToSupport }, 
+                html5QrCode.start( { facingMode: "environment" }, {
+                        fps: 10,
+                        qrbox: { width: 280, height: 150 },
+                        disableFlip: true,
+                        formatsToSupport: formatsToSupport,
+                        videoConstraints: {
+                            facingMode: "environment",
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            advanced: [{ focusMode: "continuous" }]
+                        }
+                    },
                     (decodedText) => { const now = Date.now(); if(now - lastScanTime < 1000) return; lastScanTime = now; if(navigator.vibrate) navigator.vibrate(50); processBarcode(decodedText); }, (err) => { }
+                ).then(() => { setupZoomControl(); }
                 ).catch(err => { stopCamera(); Swal.fire('เปิดกล้องไม่ได้', 'กรุณาอนุญาตสิทธิ์การเข้าถึงกล้องให้เบราว์เซอร์\n\n' + err, 'error'); });
-            }, 200); 
+            }, 200);
         }
+
+        function setupZoomControl() {
+            const zoomControl = document.getElementById('zoom-control');
+            try {
+                const zoomFeature = html5QrCode.getRunningTrackCameraCapabilities().zoomFeature();
+                if (zoomFeature && zoomFeature.isSupported()) {
+                    const slider = document.getElementById('zoom-slider');
+                    slider.min = zoomFeature.min();
+                    slider.max = zoomFeature.max();
+                    slider.step = zoomFeature.step() || 0.1;
+                    slider.value = zoomFeature.value() || zoomFeature.min();
+                    document.getElementById('zoom-value').innerText = parseFloat(slider.value).toFixed(1) + 'x';
+                    currentZoomFeature = zoomFeature;
+                    zoomControl.classList.remove('hidden');
+                    return;
+                }
+            } catch(e) {}
+            currentZoomFeature = null;
+            zoomControl.classList.add('hidden');
+        }
+
+        window.onZoomChange = function(value) {
+            if (currentZoomFeature) currentZoomFeature.apply(parseFloat(value));
+            document.getElementById('zoom-value').innerText = parseFloat(value).toFixed(1) + 'x';
+        }
+
         function stopCamera() {
-            if (html5QrCode && html5QrCode.isScanning) { html5QrCode.stop().then(() => { html5QrCode.clear(); document.getElementById('camera-modal').classList.add('hidden'); }).catch(e => { document.getElementById('camera-modal').classList.add('hidden'); }); 
+            document.getElementById('zoom-control').classList.add('hidden');
+            currentZoomFeature = null;
+            if (html5QrCode && html5QrCode.isScanning) { html5QrCode.stop().then(() => { html5QrCode.clear(); document.getElementById('camera-modal').classList.add('hidden'); }).catch(e => { document.getElementById('camera-modal').classList.add('hidden'); });
             } else { document.getElementById('camera-modal').classList.add('hidden'); }
         }
         window.submitBillToHub = function() {
