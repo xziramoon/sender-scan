@@ -834,9 +834,8 @@
                         formatsToSupport: formatsToSupport,
                         videoConstraints: {
                             facingMode: "environment",
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 },
-                            advanced: [{ focusMode: "continuous" }]
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
                         }
                     },
                     (decodedText) => { const now = Date.now(); if(now - lastScanTime < 1000) return; lastScanTime = now; if(navigator.vibrate) navigator.vibrate(50); processBarcode(decodedText); }, (err) => { }
